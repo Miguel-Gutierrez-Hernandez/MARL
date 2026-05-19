@@ -1,0 +1,42 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# Configuración por defecto — marl_traffic
+# Todos los algoritmos heredan estos valores; sus .yaml propios los sobreescriben
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ── Entorno ──────────────────────────────────────────────────────────────────
+env:
+  network: "2x2"              # Opciones: "2x2" | "3x3" | "4x4"
+  demand: "moderate"          # Opciones: "low" | "moderate" | "saturated"
+  num_seconds: 3600           # Duración de cada episodio (segundos simulados)
+  delta_time: 5               # Segundos entre decisiones de cada agente
+  yellow_time: 2              # Duración de la fase amarilla (segundos)
+  min_green: 5                # Tiempo mínimo en fase verde (segundos)
+  max_green: 60               # Tiempo máximo en fase verde (segundos)
+  use_gui: false              # true para ver la simulación gráfica (lento)
+  seed: 42
+
+# ── Entrenamiento ────────────────────────────────────────────────────────────
+training:
+  total_timesteps: 500_000    # Pasos totales de entrenamiento
+  eval_every: 10_000          # Evaluar cada N pasos
+  eval_episodes: 5            # Episodios por evaluación
+  save_every: 50_000          # Guardar checkpoint cada N pasos
+  num_runs: 5                 # Repeticiones con distintas semillas (para stats)
+  device: "cpu"               # "cpu" | "cuda" | "mps" (Apple Silicon)
+
+# ── Hiperparámetros comunes ───────────────────────────────────────────────────
+common:
+  gamma: 0.99                 # Factor de descuento
+  lr: 0.0005                  # Tasa de aprendizaje (Adam)
+  batch_size: 32              # Tamaño del mini-batch
+  buffer_size: 10_000         # Tamaño del replay buffer
+  hidden_dim: 64              # Neuronas en capas ocultas
+  grad_clip: 10.0             # Clipping de gradientes
+
+# ── Logging ──────────────────────────────────────────────────────────────────
+logging:
+  log_dir: "logs/"
+  tensorboard: true
+  wandb: false
+  wandb_project: "marl-traffic-tfm"
+  verbose: true

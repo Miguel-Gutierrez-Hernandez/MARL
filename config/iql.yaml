@@ -1,0 +1,13 @@
+# ── IQL (Independent Q-Learning) ─────────────────────────────────────────────
+# Baseline: cada semáforo aprende con su propio DQN, sin coordinación
+# ─────────────────────────────────────────────────────────────────────────────
+algorithm: "iql"
+
+iql:
+  lr: 0.0005
+  gamma: 0.99
+  epsilon_start: 1.0          # Exploración inicial (100%)
+  epsilon_end: 0.05           # Exploración mínima (5%)
+  epsilon_decay: 50_000       # Pasos hasta alcanzar epsilon_end
+  target_update_every: 200    # Cada cuántos pasos se copia la red objetivo
+  hidden_dim: 64

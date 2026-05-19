@@ -1,0 +1,27 @@
+# ── Simulador de tráfico ──────────────────────────────────────────────────────
+eclipse-sumo>=1.20.0          # SUMO instalable vía pip (incluye binarios)
+traci>=1.20.0                 # API Python para controlar SUMO en tiempo real
+sumo-rl>=1.4.5                # Wrapper Gymnasium sobre SUMO (nos ahorra ~500 líneas)
+
+# ── Entornos de RL ────────────────────────────────────────────────────────────
+gymnasium>=0.29.0             # Gymnasium: sucesor de OpenAI Gym
+pettingzoo>=1.24.0            # Gymnasium multi-agente (compatible con sumo-rl)
+
+# ── Deep Learning ─────────────────────────────────────────────────────────────
+torch>=2.2.0                  # PyTorch: redes neuronales de todos los agentes
+numpy>=1.26.0
+
+# ── Experimentos y logging ───────────────────────────────────────────────────
+pyyaml>=6.0                   # Leer archivos .yaml de configuración
+tensorboard>=2.16.0           # Visualizar curvas de entrenamiento
+wandb>=0.16.0                 # (Opcional) logging en la nube — puedes ignorarlo
+tqdm>=4.66.0                  # Barras de progreso en el terminal
+
+# ── Análisis y visualización ─────────────────────────────────────────────────
+pandas>=2.2.0
+matplotlib>=3.8.0
+seaborn>=0.13.0
+scipy>=1.12.0                 # Tests estadísticos (Mann-Whitney, etc.)
+
+# ── Utilidades ────────────────────────────────────────────────────────────────
+hydra-core>=1.3.0             # Gestión de configuraciones (opcional pero útil)

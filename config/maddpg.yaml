@@ -1,0 +1,15 @@
+# ── MADDPG (Multi-Agent DDPG) ────────────────────────────────────────────────
+# Actor local por agente + Crítico centralizado que ve obs y acciones de todos
+# ─────────────────────────────────────────────────────────────────────────────
+algorithm: "maddpg"
+
+maddpg:
+  actor_lr: 0.0001
+  critic_lr: 0.001
+  gamma: 0.99
+  tau: 0.01                   # Soft update de redes objetivo (polyak averaging)
+  noise_std: 0.1              # Ruido de exploración (Gaussiano sobre acción)
+  hidden_dim: 64
+  buffer_size: 100_000
+  batch_size: 64
+  warmup_steps: 1000          # Pasos de exploración aleatoria al inicio
