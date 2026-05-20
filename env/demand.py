@@ -89,6 +89,7 @@ def generate_demand(
     demand_level: str = "moderate",
     num_seconds: int = 3600,
     seed: Optional[int] = 42,
+    verbose: bool = True,
 ) -> str:
     """
     Genera el archivo .rou.xml con los flujos de vehículos.
@@ -158,8 +159,9 @@ def generate_demand(
     tree.write(str(output_path), encoding="unicode", xml_declaration=True)
 
     n_flows = flow_id
-    print(f"  [demand] {demand_level} → {n_flows} flujos O/D, "
-          f"prob≈{prob:.2f} ({prob*3600:.0f} veh/h por flujo)")
+    if verbose:
+        print(f"  [demand] {demand_level} → {n_flows} flujos O/D, "
+              f"prob≈{prob:.2f} ({prob*3600:.0f} veh/h por flujo)")
 
     return str(output_path)
 

@@ -1,0 +1,13 @@
+[
+  {
+    "algo": "iql",
+    "network": "2x2",
+    "demand": "moderate",
+    "mean_waiting_time": 491425.4652777778,
+    "std_waiting_time": 5.820766091346741e-11,
+    "mean_queue_length": 285.63888888888886,
+    "mean_throughput": 0.0,
+    "mean_stops": 205660.0,
+    "fairness_index": 0.9999631770843372
+  }
+]

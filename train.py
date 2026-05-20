@@ -59,18 +59,18 @@ def load_config(algo: str, override_path: str = None) -> dict:
     """Carga default.yaml y lo fusiona con el yaml del algoritmo."""
     config_dir = Path(__file__).parent / "config"
 
-    with open(config_dir / "default.yaml") as f:
+    with open(config_dir / "default.yaml", "r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
 
     algo_config_path = config_dir / f"{algo}.yaml"
     if algo_config_path.exists():
-        with open(algo_config_path) as f:
+        with open(algo_config_path, "r", encoding="utf-8") as f:
             algo_config = yaml.safe_load(f)
         config.update(algo_config)
 
     # Configuración personalizada (tiene máxima prioridad)
     if override_path:
-        with open(override_path) as f:
+        with open(override_path, "r", encoding="utf-8") as f:
             override = yaml.safe_load(f)
         config.update(override)
 
@@ -160,6 +160,7 @@ def train_one_run(algo: str, config: dict, seed: int, run_id: int,
 
     # Entorno y agente
     env = make_env(config, use_gui=use_gui)
+    env.reset(seed=seed)
     agent = make_agent(algo, env, config, device)
 
     # Importar trainer (se implementará en el Paso 4)
@@ -177,9 +178,14 @@ def train_one_run(algo: str, config: dict, seed: int, run_id: int,
     metrics = trainer.train()
     elapsed = time.time() - t_start
 
-    print(f"\n✓ Run {run_id} completada en {elapsed/60:.1f} min")
-    print(f"  Tiempo espera medio final : {metrics.get('mean_waiting_time', '?'):.2f} s")
-    print(f"  Recompensa media final    : {metrics.get('mean_reward', '?'):.4f}")
+    # Guardar resultados finales
+    print(f"  Recompensa media final    : {metrics.get('mean_reward', '?')}")
+    
+    waiting_time = metrics.get('mean_waiting_time', '?')
+    if isinstance(waiting_time, (int, float)):
+        print(f"  Tiempo espera medio final : {waiting_time:.2f} s")
+    else:
+        print(f"  Tiempo espera medio final : {waiting_time} (No evaluado)")
 
     env.close()
     return metrics

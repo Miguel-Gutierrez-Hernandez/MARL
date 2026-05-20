@@ -112,6 +112,7 @@ class MultiAgentSumoEnv:
         # Estado interno
         self._sumo_running    : bool = False
         self._step_count      : int  = 0
+        self._arrived_total   : int  = 0   # acumulado del episodio
         self.traffic_signals  : dict[str, TrafficSignal] = {}
 
         # Estos se rellenan en reset() una vez SUMO está corriendo
@@ -142,6 +143,8 @@ class MultiAgentSumoEnv:
             traci.close()
             self._sumo_running = False
 
+        self._arrived_total = 0   # reiniciar contador de vehículos llegados
+
         # Generar demanda de tráfico para este episodio
         ep_seed = seed if seed is not None else self.sumo_seed
         generate_demand(
@@ -150,6 +153,7 @@ class MultiAgentSumoEnv:
             demand_level    = self.demand,
             num_seconds     = self.num_seconds,
             seed            = ep_seed,
+            verbose         = False,
         )
 
         # Arrancar SUMO
@@ -260,11 +264,10 @@ class MultiAgentSumoEnv:
             self.traffic_signals[agent_id].apply_action(action)
 
         # 2. Avanzar la simulación delta_time segundos
-        #    La fase amarilla se activa automáticamente dentro de apply_action;
-        #    aquí simplemente dejamos que SUMO simule.
         for _ in range(self.delta_time):
             traci.simulationStep()
-            self._step_count += 1
+            self._step_count    += 1
+            self._arrived_total += traci.simulation.getArrivedNumber()  # acumular
 
             # Completar transiciones amarillas cuando toca
             for ts in self.traffic_signals.values():
@@ -303,21 +306,36 @@ class MultiAgentSumoEnv:
     # ── Métricas globales ─────────────────────────────────────────────────────
 
     def _global_metrics(self) -> dict:
-        """
-        Métricas a nivel de toda la red, usadas por el evaluador.
-        """
-        total_waiting  = sum(ts.metrics()["waiting_time"]   for ts in self.traffic_signals.values())
-        total_halting  = sum(ts.metrics()["queue_length"]   for ts in self.traffic_signals.values())
-        arrived        = traci.simulation.getArrivedNumber()
-        departed       = traci.simulation.getDepartedNumber()
+        """Métricas a nivel de toda la red."""
+        # Espera instantánea total (suma de todos los vehículos en todos los carriles)
+        total_waiting = sum(
+            traci.lane.getWaitingTime(lane)
+            for ts in self.traffic_signals.values()
+            for lane in ts.lanes
+        )
+        # Cola: vehículos parados ahora mismo
+        total_halting = sum(
+            traci.lane.getLastStepHaltingNumber(lane)
+            for ts in self.traffic_signals.values()
+            for lane in ts.lanes
+        )
+        # ── Normalización por vehículo ────────────────────────────────────────
+        # total_waiting es "veh·s" (suma de esperas individuales).
+        # Dividir entre nº de vehículos activos → segundos de espera promedio.
+        n_vehicles = max(traci.vehicle.getIDCount(), 1)
+
+        sim_time   = traci.simulation.getTime()
+        throughput = self._arrived_total / max(sim_time / 3600.0, 1e-6)
 
         return {
-            "sim_time":           traci.simulation.getTime(),
-            "total_waiting_time": total_waiting,
-            "total_queue":        total_halting,
-            "arrived_vehicles":   arrived,
-            "departed_vehicles":  departed,
-            "throughput":         arrived / max(traci.simulation.getTime() / 3600, 1e-6),
+            "sim_time":                sim_time,
+            "total_waiting_time":      total_waiting,
+            "mean_waiting_per_vehicle": total_waiting / n_vehicles,  # ← métrica útil
+            "total_queue":             total_halting,
+            "mean_queue_per_agent":    total_halting / max(len(self.traffic_signals), 1),
+            "arrived_vehicles":        self._arrived_total,
+            "n_vehicles_active":       n_vehicles,
+            "throughput":              throughput,
         }
 
     # ── Estado global (para algoritmos CTDE como QMIX, MAPPO, MADDPG) ────────

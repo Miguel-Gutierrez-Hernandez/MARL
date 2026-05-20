@@ -76,6 +76,10 @@ def evaluate_checkpoint(checkpoint_path: str, episodes: int,
     from train import make_env, make_agent
     device = config["training"].get("device", "cpu")
     env = make_env(config, use_gui=use_gui)
+    
+    # Inicializamos el entorno para que cargue los agentes en memoria antes de crear la red
+    env.reset()
+    
     agent = make_agent(algo, env, config, device)
     agent.load(str(checkpoint_path))
     agent.eval()  # Modo evaluación: sin exploración

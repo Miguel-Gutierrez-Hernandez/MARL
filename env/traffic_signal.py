@@ -67,6 +67,7 @@ class TrafficSignal:
         # Caché de la lógica de semáforos (se llena en _setup)
         self.green_phases     : list[int] = []
         self.lanes            : list[str] = []
+        self.out_lanes = []
         self.num_green_phases : int = 0
 
         self._setup()
@@ -118,17 +119,14 @@ class TrafficSignal:
 
     @property
     def observation(self) -> np.ndarray:
-        """
-        Construye el vector de observación local del agente.
-        Solo usa información de su propia intersección (MARL descentralizado).
-        """
-        densities  = self._lane_densities()
-        queues     = self._lane_queues()
+        densities = self._lane_densities()
+        queues = self._lane_queues()
         phase_onehot = self._phase_onehot()
-        time_norm  = np.array([min(self._time_in_phase / self.max_green, 1.0)])
+        time_norm = np.array([min(self._time_in_phase / self.max_green, 1.0)])
 
-        return np.concatenate([densities, queues, phase_onehot, time_norm],
-                              dtype=np.float32)
+        # Concatenar y asegurar valores entre 0 y 1
+        obs = np.concatenate([densities, queues, phase_onehot, time_norm], dtype=np.float32)
+        return np.clip(obs, 0.0, 1.0) # Esto garantiza que nada se "dispare" fuera de rango
 
     def _lane_densities(self) -> np.ndarray:
         """Fracción de ocupación de cada carril: n_vehicles / capacity."""
@@ -224,49 +222,54 @@ class TrafficSignal:
     @property
     def reward(self) -> float:
         """
-        Recompensa = reducción del tiempo de espera acumulado respecto al paso anterior.
-
-        r_t = −(W_t − W_{t-1})
-
-        Donde W_t = suma de tiempos de espera de todos los vehículos en los
-        carriles de este semáforo en el paso t.
-
-        Una recompensa positiva indica que la espera ha BAJADO (bueno).
-        Una recompensa negativa indica que la espera ha SUBIDO (malo).
+        Calcula la recompensa basada en la presión: 
+        Diferencia entre vehículos en carriles de entrada y salida.
         """
-        current_waiting = self._total_waiting_time()
-        reward = self._last_waiting - current_waiting   # positivo si mejora
-        self._last_waiting = current_waiting
-        return reward
+        # 1. Obtener presión actual
+        pressure = self._get_pressure()
+        
+        # 2. Recompensa = -Presión (queremos minimizar la presión)
+        return -float(pressure)
+
+    def _get_pressure(self) -> float:
+        """
+        Presión = sum(vehículos_en_carriles_entrada) - sum(vehículos_en_carriles_salida)
+        """
+        # Carriles de entrada (los que ya tienes en self.lanes)
+        in_pressure = sum(self.traci.lane.getLastStepVehicleNumber(lane) for lane in self.lanes)
+        
+        # Carriles de salida (necesitas identificarlos)
+        # Esto es un ejemplo, debes mapear qué carriles son los de salida
+        out_pressure = sum(self.traci.lane.getLastStepVehicleNumber(lane) for lane in self.out_lanes)
+        
+        return in_pressure - out_pressure
 
     def _total_waiting_time(self) -> float:
-        """Suma de tiempos de espera (segundos) de los vehículos en cada carril."""
-        total = 0.0
-        for lane in self.lanes:
-            vehicles = self.traci.lane.getLastStepVehicleIDs(lane)
-            for veh_id in vehicles:
-                total += self.traci.vehicle.getAccumulatedWaitingTime(veh_id)
-        return total
+        """
+        Suma del tiempo de espera INSTANTÁNEO por carril.
+
+        traci.lane.getWaitingTime(lane) devuelve la suma de waitingTime
+        de todos los vehículos en ese carril en este paso de simulación.
+        waitingTime de un vehículo se resetea a 0 cuando supera 0.1 m/s,
+        por lo que no crece sin límite como getAccumulatedWaitingTime.
+        """
+        return sum(
+            self.traci.lane.getWaitingTime(lane)
+            for lane in self.lanes
+        )
 
     # ── Métricas de evaluación ────────────────────────────────────────────────
 
     def metrics(self) -> dict:
-        """
-        Devuelve métricas locales de esta intersección para el logger.
-        El entorno las agrega a nivel de red.
-        """
-        total_vehicles = sum(
-            self.traci.lane.getLastStepVehicleNumber(l) for l in self.lanes
-        )
-        halting = sum(
-            self.traci.lane.getLastStepHaltingNumber(l) for l in self.lanes
-        )
-        waiting = self._total_waiting_time()
+        """Devuelve métricas locales de esta intersección para el logger."""
+        halting = sum(self.traci.lane.getLastStepHaltingNumber(l) for l in self.lanes)
+        waiting = sum(self.traci.lane.getWaitingTime(l)             for l in self.lanes)
+        total   = sum(self.traci.lane.getLastStepVehicleNumber(l) for l in self.lanes)
 
         return {
             "ts_id":          self.id,
             "queue_length":   halting,
             "waiting_time":   waiting,
-            "total_vehicles": total_vehicles,
+            "total_vehicles": total,
             "phase":          self._current_phase,
         }
