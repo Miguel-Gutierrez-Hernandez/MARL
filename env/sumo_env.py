@@ -168,6 +168,7 @@ class MultiAgentSumoEnv:
 
         # Observaciones iniciales (un paso de simulación para tener datos)
         traci.simulationStep()
+        self._arrived_total += traci.simulation.getArrivedNumber()
         observations = {
             agent_id: ts.observation
             for agent_id, ts in self.traffic_signals.items()
@@ -266,13 +267,18 @@ class MultiAgentSumoEnv:
         # 2. Avanzar la simulación delta_time segundos
         for _ in range(self.delta_time):
             traci.simulationStep()
-            self._step_count    += 1
-            self._arrived_total += traci.simulation.getArrivedNumber()  # acumular
+            self._step_count += 1
 
             # Completar transiciones amarillas cuando toca
             for ts in self.traffic_signals.values():
-                if ts._in_yellow and ts._time_in_phase >= self.yellow_time:
-                    ts.complete_yellow()
+                if ts._in_yellow:
+                    ts._time_in_phase += 1
+                    if ts._time_in_phase >= self.yellow_time:
+                        ts.complete_yellow()
+
+        # TraCI devuelve el número de vehículos llegados en este paso.
+        # Acumulamos para obtener el total del episodio.
+        self._arrived_total += traci.simulation.getArrivedNumber()
 
         # 3. Calcular recompensas (después de los delta_time segundos)
         rewards = {

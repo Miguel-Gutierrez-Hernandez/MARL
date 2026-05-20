@@ -62,13 +62,16 @@ class TrafficSignal:
         self._time_in_phase   : int  = 0    # Segundos en la fase actual
         self._in_yellow       : bool = False
         self._next_phase      : int  = 0    # Fase destino tras el amarillo
-        self._last_waiting    : float = 0.0  # Para calcular la recompensa
+        self._last_pressure   : float = 0.0  # Para calcular la recompensa delta
 
         # Caché de la lógica de semáforos (se llena en _setup)
         self.green_phases     : list[int] = []
+        self._phase_states    : list[str] = []
         self.lanes            : list[str] = []
-        self.out_lanes = []
+        self.out_lanes        : list[str] = []
         self.num_green_phases : int = 0
+        self._phase_count     : int = 0
+        self._yellow_state    : str | None = None
 
         self._setup()
 
@@ -79,30 +82,87 @@ class TrafficSignal:
         # Obtener la lógica de semáforo del nodo
         logic = self.traci.trafficlight.getAllProgramLogics(self.id)[0]
         all_phases = logic.phases
+        self._phase_count = len(all_phases)
 
         # Identificar fases verdes (las que contienen 'G' o 'g' pero no 'y'/'Y')
-        self.green_phases = [
-            i for i, p in enumerate(all_phases)
+        self._phase_states = [
+            p.state for p in all_phases
             if ("G" in p.state or "g" in p.state)
             and "y" not in p.state.lower()
         ]
-        self.num_green_phases = len(self.green_phases)
 
         # Carriles controlados por este semáforo
         controlled_links = self.traci.trafficlight.getControlledLinks(self.id)
-        seen = set()
+        seen_in = set()
+        seen_out = set()
         for link_list in controlled_links:
             for link in link_list:
-                if link and link[0] not in seen:
+                if not link:
+                    continue
+                if link[0] and link[0] not in seen_in:
                     self.lanes.append(link[0])   # link[0] = carril de entrada
-                    seen.add(link[0])
+                    seen_in.add(link[0])
+                if link[1] and link[1] not in seen_out:
+                    self.out_lanes.append(link[1])   # link[1] = carril de salida
+                    seen_out.add(link[1])
+
+        # Si SUMO no definió fases útiles, construimos fases manuales por dirección
+        if len(self._phase_states) <= 1:
+            self._phase_states = self._build_default_phase_states(controlled_links)
+            phases = [
+                self.traci.trafficlight.Phase(self.max_green, state)
+                for state in self._phase_states
+            ]
+            custom_logic = self.traci.trafficlight.Logic(
+                "0",
+                logic.type,
+                0,
+                phases=phases,
+            )
+            self.traci.trafficlight.setProgramLogic(self.id, custom_logic)
+            self.traci.trafficlight.setProgram(self.id, "0")
+            self._phase_count = len(phases)
+
+        self.num_green_phases = len(self._phase_states)
+        self.green_phases = list(range(self.num_green_phases))
 
         # Número de carriles por fase (para el espacio de observación)
         self._num_lanes = len(self.lanes)
 
         # Fase inicial
-        self._current_phase = self.green_phases[0] if self.green_phases else 0
-        self.traci.trafficlight.setPhase(self.id, self._current_phase)
+        self._current_phase = 0
+        self.traci.trafficlight.setRedYellowGreenState(self.id, self._phase_states[0])
+
+    def _build_default_phase_states(self, controlled_links: list[list[tuple[str, str, str]]]) -> list[str]:
+        """Crea fases manuales por dirección cuando SUMO solo genera una fase estática."""
+        # Ordenamos los enlaces entrantes por dirección y agruparlos.
+        groups: dict[str, list[int]] = {}
+        order: list[str] = []
+        for signal_idx, link_list in enumerate(controlled_links):
+            if not link_list or not link_list[0] or not link_list[0][0]:
+                continue
+            in_edge = link_list[0][0].split("_")[0]
+            if in_edge not in groups:
+                groups[in_edge] = []
+                order.append(in_edge)
+            groups[in_edge].append(signal_idx)
+
+        # Si no hay suficientes grupos para construir varias fases, conservar el estado actual.
+        if len(order) <= 1:
+            base_state = self._phase_states[0] if self._phase_states else ""
+            return [base_state or "G" * len(controlled_links)]
+
+        signal_count = len(self._phase_states[0]) if self._phase_states else len(controlled_links)
+        phase_states = []
+        for in_edge in order:
+            indices = set(groups[in_edge])
+            state = "".join(
+                "G" if idx in indices else "r"
+                for idx in range(signal_count)
+            )
+            phase_states.append(state)
+
+        return phase_states
 
     # ── Espacio de observación ─────────────────────────────────────────────────
 
@@ -151,9 +211,8 @@ class TrafficSignal:
     def _phase_onehot(self) -> np.ndarray:
         """Vector one-hot indicando qué fase verde está activa."""
         vec = np.zeros(self.num_green_phases, dtype=np.float32)
-        if self._current_phase in self.green_phases:
-            idx = self.green_phases.index(self._current_phase)
-            vec[idx] = 1.0
+        if 0 <= self._current_phase < self.num_green_phases:
+            vec[self._current_phase] = 1.0
         return vec
 
     # ── Espacio de acción ─────────────────────────────────────────────────────
@@ -176,7 +235,9 @@ class TrafficSignal:
           4. Si ya está en amarillo → esperar a que termine.
         """
         if self._in_yellow:
-            # Estamos en la transición amarilla; no hacer nada hasta que acabe
+            # Estamos en la transición amarilla; mantener el estado mientras la espera
+            if self._yellow_state is not None:
+                self.traci.trafficlight.setRedYellowGreenState(self.id, self._yellow_state)
             return
 
         target_phase = self.green_phases[action]
@@ -192,16 +253,16 @@ class TrafficSignal:
             return
 
         # Cambio de fase: activar amarillo intermedio
-        self._next_phase  = target_phase
-        self._in_yellow   = True
+        self._next_phase    = target_phase
+        self._in_yellow     = True
         self._time_in_phase = 0
 
         # Construir una fase amarilla: sustituir G/g por y en la fase actual
-        logic = self.traci.trafficlight.getAllProgramLogics(self.id)[0]
-        current_state = logic.phases[self._current_phase].state
+        current_state = self._phase_states[self._current_phase]
         yellow_state  = current_state.replace("G", "y").replace("g", "y")
+        self._yellow_state = yellow_state
 
-        self.traci.trafficlight.setPhase(self.id, self._current_phase)
+        self.traci.trafficlight.setRedYellowGreenState(self.id, yellow_state)
         self.traci.trafficlight.setPhaseDuration(self.id, self.yellow_time)
         # Nota: la transición real la completa `complete_yellow()` después de
         # yellow_time segundos de simulación
@@ -215,33 +276,41 @@ class TrafficSignal:
             self._current_phase = self._next_phase
             self._in_yellow     = False
             self._time_in_phase = 0
-            self.traci.trafficlight.setPhase(self.id, self._current_phase)
+            self._yellow_state  = None
+            self.traci.trafficlight.setRedYellowGreenState(
+                self.id,
+                self._phase_states[self._current_phase],
+            )
 
     # ── Recompensa ────────────────────────────────────────────────────────────
 
     @property
     def reward(self) -> float:
         """
-        Calcula la recompensa basada en la presión: 
-        Diferencia entre vehículos en carriles de entrada y salida.
+        Recompensa basada en la reducción de presión local.
+
+        Usamos el cambio en presión entre pasos y lo normalizamos para que el
+        valor permanezca acotado y sea estable durante el aprendizaje.
         """
-        # 1. Obtener presión actual
         pressure = self._get_pressure()
-        
-        # 2. Recompensa = -Presión (queremos minimizar la presión)
-        return -float(pressure)
+        delta_pressure = float(self._last_pressure - pressure)
+        normalizer = max(abs(self._last_pressure) + abs(pressure), 1.0)
+        reward = delta_pressure / normalizer
+        self._last_pressure = pressure
+        return reward
 
     def _get_pressure(self) -> float:
         """
-        Presión = sum(vehículos_en_carriles_entrada) - sum(vehículos_en_carriles_salida)
+        Presión local = vehículos en carriles de entrada - vehículos en carriles de salida.
         """
-        # Carriles de entrada (los que ya tienes en self.lanes)
-        in_pressure = sum(self.traci.lane.getLastStepVehicleNumber(lane) for lane in self.lanes)
-        
-        # Carriles de salida (necesitas identificarlos)
-        # Esto es un ejemplo, debes mapear qué carriles son los de salida
-        out_pressure = sum(self.traci.lane.getLastStepVehicleNumber(lane) for lane in self.out_lanes)
-        
+        in_pressure = sum(
+            self.traci.lane.getLastStepVehicleNumber(lane)
+            for lane in self.lanes
+        )
+        out_pressure = sum(
+            self.traci.lane.getLastStepVehicleNumber(lane)
+            for lane in self.out_lanes
+        )
         return in_pressure - out_pressure
 
     def _total_waiting_time(self) -> float:
