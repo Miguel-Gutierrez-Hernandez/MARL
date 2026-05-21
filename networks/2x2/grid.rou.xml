@@ -1,20 +1,20 @@
 <?xml version='1.0' encoding='utf-8'?>
 <routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/routes_file.xsd">
     <vType id="car" accel="2.6" decel="4.5" sigma="0.5" length="5.0" maxSpeed="13.89" guiShape="passenger" />
-    <flow id="flow_0" type="car" from="A0A1" to="B0A0" begin="0" end="3600" probability="0.0649" departLane="random" departSpeed="random" />
-    <flow id="flow_1" type="car" from="A0A1" to="B0B1" begin="0" end="3600" probability="0.0302" departLane="random" departSpeed="random" />
-    <flow id="flow_2" type="car" from="A0A1" to="B1A1" begin="0" end="3600" probability="0.0367" departLane="random" departSpeed="random" />
-    <flow id="flow_3" type="car" from="A0A1" to="B1B0" begin="0" end="3600" probability="0.0459" departLane="random" departSpeed="random" />
-    <flow id="flow_4" type="car" from="A0B0" to="B0A0" begin="0" end="3600" probability="0.0479" departLane="random" departSpeed="random" />
-    <flow id="flow_5" type="car" from="A0B0" to="B0B1" begin="0" end="3600" probability="0.0405" departLane="random" departSpeed="random" />
-    <flow id="flow_6" type="car" from="A0B0" to="B1A1" begin="0" end="3600" probability="0.0361" departLane="random" departSpeed="random" />
-    <flow id="flow_7" type="car" from="A0B0" to="B1B0" begin="0" end="3600" probability="0.0535" departLane="random" departSpeed="random" />
-    <flow id="flow_8" type="car" from="A1A0" to="B0A0" begin="0" end="3600" probability="0.0303" departLane="random" departSpeed="random" />
-    <flow id="flow_9" type="car" from="A1A0" to="B0B1" begin="0" end="3600" probability="0.0676" departLane="random" departSpeed="random" />
-    <flow id="flow_10" type="car" from="A1A0" to="B1A1" begin="0" end="3600" probability="0.0687" departLane="random" departSpeed="random" />
-    <flow id="flow_11" type="car" from="A1A0" to="B1B0" begin="0" end="3600" probability="0.0697" departLane="random" departSpeed="random" />
-    <flow id="flow_12" type="car" from="A1B1" to="B0A0" begin="0" end="3600" probability="0.0692" departLane="random" departSpeed="random" />
-    <flow id="flow_13" type="car" from="A1B1" to="B0B1" begin="0" end="3600" probability="0.0349" departLane="random" departSpeed="random" />
-    <flow id="flow_14" type="car" from="A1B1" to="B1A1" begin="0" end="3600" probability="0.0593" departLane="random" departSpeed="random" />
-    <flow id="flow_15" type="car" from="A1B1" to="B1B0" begin="0" end="3600" probability="0.0544" departLane="random" departSpeed="random" />
+    <flow id="flow_0" type="car" from="A0A1" to="B0A0" begin="0" end="3600" probability="0.0556" departLane="random" departSpeed="random" />
+    <flow id="flow_1" type="car" from="A0A1" to="B0B1" begin="0" end="3600" probability="0.0310" departLane="random" departSpeed="random" />
+    <flow id="flow_2" type="car" from="A0A1" to="B1A1" begin="0" end="3600" probability="0.0410" departLane="random" departSpeed="random" />
+    <flow id="flow_3" type="car" from="A0A1" to="B1B0" begin="0" end="3600" probability="0.0389" departLane="random" departSpeed="random" />
+    <flow id="flow_4" type="car" from="A0B0" to="B0A0" begin="0" end="3600" probability="0.0595" departLane="random" departSpeed="random" />
+    <flow id="flow_5" type="car" from="A0B0" to="B0B1" begin="0" end="3600" probability="0.0571" departLane="random" departSpeed="random" />
+    <flow id="flow_6" type="car" from="A0B0" to="B1A1" begin="0" end="3600" probability="0.0657" departLane="random" departSpeed="random" />
+    <flow id="flow_7" type="car" from="A0B0" to="B1B0" begin="0" end="3600" probability="0.0335" departLane="random" departSpeed="random" />
+    <flow id="flow_8" type="car" from="A1A0" to="B0A0" begin="0" end="3600" probability="0.0469" departLane="random" departSpeed="random" />
+    <flow id="flow_9" type="car" from="A1A0" to="B0B1" begin="0" end="3600" probability="0.0312" departLane="random" departSpeed="random" />
+    <flow id="flow_10" type="car" from="A1A0" to="B1A1" begin="0" end="3600" probability="0.0387" departLane="random" departSpeed="random" />
+    <flow id="flow_11" type="car" from="A1A0" to="B1B0" begin="0" end="3600" probability="0.0502" departLane="random" departSpeed="random" />
+    <flow id="flow_12" type="car" from="A1B1" to="B0A0" begin="0" end="3600" probability="0.0311" departLane="random" departSpeed="random" />
+    <flow id="flow_13" type="car" from="A1B1" to="B0B1" begin="0" end="3600" probability="0.0380" departLane="random" departSpeed="random" />
+    <flow id="flow_14" type="car" from="A1B1" to="B1A1" begin="0" end="3600" probability="0.0560" departLane="random" departSpeed="random" />
+    <flow id="flow_15" type="car" from="A1B1" to="B1B0" begin="0" end="3600" probability="0.0518" departLane="random" departSpeed="random" />
 </routes>
