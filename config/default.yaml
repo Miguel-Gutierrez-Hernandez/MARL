@@ -26,11 +26,11 @@ training:
 
 # ── Hiperparámetros comunes ───────────────────────────────────────────────────
 common:
-  gamma: 0.99                 # Factor de descuento
+  gamma: 0.95                 # Factor de descuento
   lr: 0.0005                  # Tasa de aprendizaje (Adam)
-  batch_size: 32              # Tamaño del mini-batch
+  batch_size: 128             # Tamaño del mini-batch
   buffer_size: 10_000         # Tamaño del replay buffer
-  hidden_dim: 64              # Neuronas en capas ocultas
+  hidden_dim: 128             # Neuronas en capas ocultas
   grad_clip: 10.0             # Clipping de gradientes
 
 # ── Logging ──────────────────────────────────────────────────────────────────

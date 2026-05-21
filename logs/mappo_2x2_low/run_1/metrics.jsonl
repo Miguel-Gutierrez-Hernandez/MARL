@@ -1,0 +1,7 @@
+{"step": 1995, "prefix": "train", "elapsed": 10.65596866607666, "loss_actor": -0.00015701085678330174, "loss_critic": 27.16573829650879, "entropy": 0.6931189179420472}
+{"step": 1, "prefix": "episode", "elapsed": 17.29540228843689, "mean_reward": -248.84838732757498, "mean_waiting_per_vehicle": 3205.4867549668875, "mean_queue_per_agent": 75.0, "throughput": 22.993612885309634, "episode_steps": 720}
+{"step": 3995, "prefix": "train", "elapsed": 19.4568932056427, "loss_actor": -3.501987154663766e-05, "loss_critic": 22.3317081451416, "entropy": 0.6929328560829162}
+{"step": 5995, "prefix": "train", "elapsed": 27.226227283477783, "loss_actor": -7.33754623212235e-05, "loss_critic": 16.94589157104492, "entropy": 0.6926674008369446}
+{"step": 2, "prefix": "episode", "elapsed": 32.5399432182312, "mean_reward": -245.51465422181087, "mean_waiting_per_vehicle": 3277.720930232558, "mean_queue_per_agent": 75.25, "throughput": 10.996945292974173, "episode_steps": 720}
+{"step": 7995, "prefix": "train", "elapsed": 36.20503234863281, "loss_actor": -0.00011471283296202728, "loss_critic": 14.71768569946289, "entropy": 0.6927168011665344}
+{"step": 9995, "prefix": "train", "elapsed": 44.640216588974, "loss_actor": -9.01508293736697e-05, "loss_critic": 7.610059213638306, "entropy": 0.6928509831428528}

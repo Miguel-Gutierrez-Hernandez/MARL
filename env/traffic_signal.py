@@ -63,6 +63,7 @@ class TrafficSignal:
         self._in_yellow       : bool = False
         self._next_phase      : int  = 0    # Fase destino tras el amarillo
         self._last_pressure   : float = 0.0  # Para calcular la recompensa delta
+        self._phase_changed   : bool = False  # Detectar cambio de fase (para penalizar flickering)
 
         # Caché de la lógica de semáforos (se llena en _setup)
         self.green_phases     : list[int] = []
@@ -72,6 +73,7 @@ class TrafficSignal:
         self.num_green_phases : int = 0
         self._phase_count     : int = 0
         self._yellow_state    : str | None = None
+        self._phase_changed   : bool = False
 
         self._setup()
 
@@ -172,20 +174,22 @@ class TrafficSignal:
         Tamaño del vector de observación:
           - densidad por carril      (num_lanes valores en [0,1])
           - cola normalizada          (num_lanes valores en [0,1])
+          - espera normalizada        (num_lanes valores en [0,1])
           - fase actual (one-hot)    (num_green_phases valores en {0,1})
           - tiempo en fase normaliz. (1 valor en [0,1])
         """
-        return self._num_lanes * 2 + self.num_green_phases + 1
+        return self._num_lanes * 3 + self.num_green_phases + 1
 
     @property
     def observation(self) -> np.ndarray:
         densities = self._lane_densities()
         queues = self._lane_queues()
+        waits = self._lane_waits()
         phase_onehot = self._phase_onehot()
         time_norm = np.array([min(self._time_in_phase / self.max_green, 1.0)])
 
         # Concatenar y asegurar valores entre 0 y 1
-        obs = np.concatenate([densities, queues, phase_onehot, time_norm], dtype=np.float32)
+        obs = np.concatenate([densities, queues, waits, phase_onehot, time_norm], dtype=np.float32)
         return np.clip(obs, 0.0, 1.0) # Esto garantiza que nada se "dispare" fuera de rango
 
     def _lane_densities(self) -> np.ndarray:
@@ -207,6 +211,15 @@ class TrafficSignal:
             capacity = max(length / 7.5, 1)
             queues.append(min(n_halt / capacity, 1.0))
         return np.array(queues, dtype=np.float32)
+
+    def _lane_waits(self) -> np.ndarray:
+        """Tiempo de espera medio normalizado en cada carril."""
+        waits = []
+        for lane in self.lanes:
+            w = self.traci.lane.getWaitingTime(lane)
+            n = max(self.traci.lane.getLastStepVehicleNumber(lane), 1)
+            waits.append(min((w / n) / 100.0, 1.0)) # Normalizado a 100 segundos
+        return np.array(waits, dtype=np.float32)
 
     def _phase_onehot(self) -> np.ndarray:
         """Vector one-hot indicando qué fase verde está activa."""
@@ -234,6 +247,7 @@ class TrafficSignal:
           3. Si quiere cambiar → activar fase amarilla primero.
           4. Si ya está en amarillo → esperar a que termine.
         """
+        self._phase_changed = False
         if self._in_yellow:
             # Estamos en la transición amarilla; mantener el estado mientras la espera
             if self._yellow_state is not None:
@@ -245,17 +259,21 @@ class TrafficSignal:
         if target_phase == self._current_phase:
             # Misma fase: simplemente incrementar el contador
             self._time_in_phase += self.delta_time
+            self._phase_changed = False
             return
 
         if self._time_in_phase < self.min_green:
             # No ha pasado el tiempo mínimo en verde → forzar la espera
             self._time_in_phase += self.delta_time
+            self._phase_changed = False
             return
 
         # Cambio de fase: activar amarillo intermedio
+        self._phase_changed = True
         self._next_phase    = target_phase
         self._in_yellow     = True
         self._time_in_phase = 0
+        self._phase_changed = True  # Marcar que se intenta cambiar de fase
 
         # Construir una fase amarilla: sustituir G/g por y en la fase actual
         current_state = self._phase_states[self._current_phase]
@@ -287,16 +305,22 @@ class TrafficSignal:
     @property
     def reward(self) -> float:
         """
-        Recompensa basada en la reducción de presión local.
-
-        Usamos el cambio en presión entre pasos y lo normalizamos para que el
-        valor permanezca acotado y sea estable durante el aprendizaje.
+        Recompensa basada solo en delta-pressure normalizado.
+        
+        - Señal principal: delta-presión (reducción de congestión)
+        - Penalización: -1.0 si el agente cambió de fase (anti-flickering)
         """
         pressure = self._get_pressure()
         delta_pressure = float(self._last_pressure - pressure)
-        normalizer = max(abs(self._last_pressure) + abs(pressure), 1.0)
-        reward = delta_pressure / normalizer
+        pressure_norm = delta_pressure / max(abs(self._last_pressure) + abs(pressure), 1.0)
+
+        # Penalización por cambio de fase (flickering)
+        phase_change_penalty = -1.0 if self._phase_changed else 0.0
+        
+        reward = pressure_norm + phase_change_penalty
+        
         self._last_pressure = pressure
+        self._phase_changed = False  # Resetear el flag después de usar
         return reward
 
     def _get_pressure(self) -> float:
@@ -326,7 +350,12 @@ class TrafficSignal:
             self.traci.lane.getWaitingTime(lane)
             for lane in self.lanes
         )
-
+    def _total_queue_length(self) -> float:
+        """Número total de vehículos detenidos en los carriles de entrada."""
+        return sum(
+            self.traci.lane.getLastStepHaltingNumber(lane)
+            for lane in self.lanes
+        )
     # ── Métricas de evaluación ────────────────────────────────────────────────
 
     def metrics(self) -> dict:

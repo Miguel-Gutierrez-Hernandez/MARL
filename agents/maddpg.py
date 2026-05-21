@@ -57,6 +57,10 @@ class MADDPGAgent(BaseAgent):
         self.hidden_dim  = cfg.get("hidden_dim",  64)
         self.grad_clip   = com.get("grad_clip",   10.0)
 
+        self.gumbel_temp       = cfg.get("gumbel_temp_start", 1.0)
+        self.gumbel_temp_end   = cfg.get("gumbel_temp_end", 0.1)
+        self.gumbel_temp_decay = cfg.get("gumbel_temp_decay", 50000)
+
         self._step    = 0
         n_agents      = len(self.agents)
         obs_dim       = list(self.obs_shapes.values())[0]
@@ -105,12 +109,18 @@ class MADDPGAgent(BaseAgent):
                 actions[agent_id] = np.random.randint(self.n_actions[agent_id])
             elif explore:
                 # Gumbel-Softmax con temperatura para exploración
-                gumbel = F.gumbel_softmax(logits, tau=1.0, hard=True)
+                gumbel = F.gumbel_softmax(logits, tau=self.gumbel_temp, hard=True)
                 # Añadir ruido gaussiano pequeño antes del argmax
                 noisy  = gumbel + torch.randn_like(gumbel) * self.noise_std
                 actions[agent_id] = noisy.argmax(dim=1).item()
             else:
                 actions[agent_id] = logits.argmax(dim=1).item()
+
+        if explore and self._step >= self.warmup_steps:
+            self.gumbel_temp = max(
+                self.gumbel_temp_end,
+                self.gumbel_temp - (1.0 - self.gumbel_temp_end) / self.gumbel_temp_decay,
+            )
 
         self._step += 1
         return actions
@@ -175,7 +185,7 @@ class MADDPGAgent(BaseAgent):
         curr_actions_oh_list = []
         for a in self.agents:
             logits = self.actor(batch["obs"][a])
-            oh     = F.gumbel_softmax(logits, tau=1.0, hard=True)  # diferenciable
+            oh     = F.gumbel_softmax(logits, tau=self.gumbel_temp, hard=True)  # diferenciable
             curr_actions_oh_list.append(oh)
         all_curr_actions_oh = torch.cat(curr_actions_oh_list, dim=1)
 
@@ -201,6 +211,7 @@ class MADDPGAgent(BaseAgent):
             "actor":  self.actor.state_dict(),
             "critic": self.critic.state_dict(),
             "step":   self._step,
+            "gumbel_temp": self.gumbel_temp,
         }, path)
 
     def load(self, path: str):
@@ -210,3 +221,4 @@ class MADDPGAgent(BaseAgent):
         self._hard_update(self.actor,  self.target_actor)
         self._hard_update(self.critic, self.target_critic)
         self._step = ckpt.get("step", 0)
+        self.gumbel_temp = ckpt.get("gumbel_temp", self.gumbel_temp_end)
