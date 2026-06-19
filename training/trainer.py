@@ -211,6 +211,7 @@ class Trainer:
             done   = False
 
             # Acumuladores por paso (para promediar sobre el episodio)
+            step_rewards = []
             step_waiting_per_veh  = []
             step_queue_per_agent  = []
             ts_waiting_accumulator = {a: [] for a in self.env.agents}
@@ -219,8 +220,14 @@ class Trainer:
                 with __import__("torch").no_grad():
                     actions = self.agent.act(obs, explore=False)
 
-                obs, _, terminated, truncated, info = self.env.step(actions)
+                obs, rewards, terminated, truncated, info = self.env.step(actions)
                 done = all(terminated.values()) or all(truncated.values())
+
+                # registrar la recompensa media en este paso (media sobre agentes)
+                try:
+                    step_rewards.append(float(np.mean(list(rewards.values()))))
+                except Exception:
+                    pass
 
                 g = info.get("__global__", {})
                 step_waiting_per_veh.append(g.get("mean_waiting_per_vehicle", 0))
@@ -240,6 +247,9 @@ class Trainer:
             sim_time      = self.env.delta_time * len(step_waiting_per_veh)
             throughput    = arrived / max(sim_time / 3600.0, 1e-6)
 
+            # Recompensa media del episodio (media por paso)
+            mean_reward_ep = float(np.mean(step_rewards)) if step_rewards else 0.0
+
             # Equidad de Jain entre intersecciones (media del episodio por agente)
             per_ts_means = [
                 float(np.mean(ts_waiting_accumulator[a])) if ts_waiting_accumulator[a] else 0.0
@@ -253,6 +263,7 @@ class Trainer:
             fairness_list       .append(fairness)
 
         eval_metrics = {
+            "mean_reward":       float(np.mean([mean_reward_ep])),
             "mean_waiting_time":  float(np.mean(waiting_per_veh_list)),
             "std_waiting_time":   float(np.std (waiting_per_veh_list)),
             "mean_queue_length":  float(np.mean(queue_per_agent_list)),

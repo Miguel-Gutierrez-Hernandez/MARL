@@ -64,6 +64,7 @@ class TrafficSignal:
         self._next_phase      : int  = 0    # Fase destino tras el amarillo
         self._last_pressure   : float = 0.0  # Para calcular la recompensa delta
         self._phase_changed   : bool = False  # Detectar cambio de fase (para penalizar flickering)
+        self._time_since_last_change : float = 0.0  # Segundos desde el último cambio de fase (penalizar congelamiento)
 
         # Caché de la lógica de semáforos (se llena en _setup)
         self.green_phases     : list[int] = []
@@ -133,6 +134,7 @@ class TrafficSignal:
 
         # Fase inicial
         self._current_phase = 0
+        self._time_since_last_change = 0.0  # Sin cambios inicialmente
         self.traci.trafficlight.setRedYellowGreenState(self.id, self._phase_states[0])
 
     def _build_default_phase_states(self, controlled_links: list[list[tuple[str, str, str]]]) -> list[str]:
@@ -259,12 +261,14 @@ class TrafficSignal:
         if target_phase == self._current_phase:
             # Misma fase: simplemente incrementar el contador
             self._time_in_phase += self.delta_time
+            self._time_since_last_change += self.delta_time  # Acumular tiempo sin cambio
             self._phase_changed = False
             return
 
         if self._time_in_phase < self.min_green:
             # No ha pasado el tiempo mínimo en verde → forzar la espera
             self._time_in_phase += self.delta_time
+            self._time_since_last_change += self.delta_time  # Acumular tiempo sin cambio
             self._phase_changed = False
             return
 
@@ -294,6 +298,7 @@ class TrafficSignal:
             self._current_phase = self._next_phase
             self._in_yellow     = False
             self._time_in_phase = 0
+            self._time_since_last_change = 0.0  # Resetear contador de tiempo sin cambios
             self._yellow_state  = None
             self.traci.trafficlight.setRedYellowGreenState(
                 self.id,
@@ -305,20 +310,30 @@ class TrafficSignal:
     @property
     def reward(self) -> float:
         """
-        Recompensa basada solo en delta-pressure normalizado.
-        
-        - Señal principal: delta-presión (reducción de congestión)
-        - Penalización: -1.0 si el agente cambió de fase (anti-flickering)
+        Recompensa balanceada: presión + penalizaciones simétricas.
+
+        - Señal principal        : delta-presión normalizada     → [-1, +1]
+        - Penalización cambio    : cambio de fase                → -0.03
+        - Penalización congelazo : sin cambios tras max_green    → -0.02 periódico
+
+        Estrategia anti-congelamiento: si lleva max_green o más sin cambiar,
+        recibe -0.02 cada paso para incentivarlo a explorar nuevas fases.
         """
         pressure = self._get_pressure()
         delta_pressure = float(self._last_pressure - pressure)
         pressure_norm = delta_pressure / max(abs(self._last_pressure) + abs(pressure), 1.0)
 
-        # Penalización por cambio de fase (flickering)
-        phase_change_penalty = -1.0 if self._phase_changed else 0.0
-        
-        reward = pressure_norm + phase_change_penalty
-        
+        # Penalización por cambio de fase: -0.03 (simétrica, suave)
+        phase_change_penalty = -0.03 if self._phase_changed else 0.0
+
+        # Penalización periódica por congelamiento: -0.02 si no cambia tras max_green segundos
+        no_change_penalty = 0.0
+        if self._time_since_last_change >= self.max_green:
+            # Acumula -0.02 cada paso que sigue sin cambiar
+            no_change_penalty = -0.02
+
+        reward = pressure_norm + phase_change_penalty + no_change_penalty
+
         self._last_pressure = pressure
         self._phase_changed = False  # Resetear el flag después de usar
         return reward

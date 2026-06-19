@@ -151,7 +151,20 @@ python evaluate.py --compare --network 2x2 --demand moderate --save_plots
 
 ---
 
-## 6. Orden de implementación recomendado
+## 6. Recompensa actual
+
+La recompensa actual del entorno se basa en la reducción de presión local y penaliza el comportamiento de fase con valores suaves y balanceados.
+
+- **Señal principal**: delta-presión normalizada entre entradas y salidas → rango `[-1, +1]`
+- **Penalización por cambio de fase**: `-0.03`
+- **Penalización por congestión fija**: ya no se usa
+- **Penalización por congelamiento**: `-0.02` cada paso cuando un semáforo mantiene la misma fase durante `max_green` segundos (60s)
+
+Esto busca evitar tanto el cambio excesivo como el estancamiento prolongado.
+
+---
+
+## 7. Orden de implementación recomendado
 
 ```
 [✓] Paso 1 — Configuración y arranque      (este README)

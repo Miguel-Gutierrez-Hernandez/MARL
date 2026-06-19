@@ -11,6 +11,6 @@ mappo:
   clip_eps: 0.2               # Clipping de PPO (rango [1-ε, 1+ε])
   ppo_epochs: 5               # Actualizaciones por batch recolectado
   value_loss_coef: 0.5        # Peso de la pérdida del crítico
-  entropy_coef: 0.01          # Coeficiente de entropía (fomenta exploración)
+  entropy_coef: 0.05          # ↑ subido de 0.01 → mantiene exploración más tiempo
   hidden_dim: 128
-  rollout_length: 400         # Pasos recolectados antes de cada actualización
+  rollout_length: 1600        # ↑ subido de 400 → ve más consecuencias antes de actualizar
