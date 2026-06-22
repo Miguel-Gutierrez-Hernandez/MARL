@@ -122,6 +122,7 @@ class MultiAgentSumoEnv:
         # Espacios de acción y observación (se inicializan en reset)
         self.observation_spaces : dict[str, gym.Space] = {}
         self.action_spaces      : dict[str, gym.Space] = {}
+        self._max_obs_size      : int = 0
 
     # ── Reset ─────────────────────────────────────────────────────────────────
 
@@ -170,7 +171,7 @@ class MultiAgentSumoEnv:
         traci.simulationStep()
         self._arrived_total += traci.simulation.getArrivedNumber()
         observations = {
-            agent_id: ts.observation
+            agent_id: self._pad_observation(ts.observation)
             for agent_id, ts in self.traffic_signals.items()
         }
 
@@ -219,17 +220,29 @@ class MultiAgentSumoEnv:
         self.observation_spaces = {}
         self.action_spaces      = {}
 
+        self._max_obs_size = max(
+            ts.observation_space_size
+            for ts in self.traffic_signals.values()
+        )
+
         for agent_id, ts in self.traffic_signals.items():
-            obs_size = ts.observation_space_size
             n_actions = ts.action_space_size
 
             self.observation_spaces[agent_id] = gym.spaces.Box(
                 low   = 0.0,
                 high  = 1.0,
-                shape = (obs_size,),
+                shape = (self._max_obs_size,),
                 dtype = np.float32,
             )
             self.action_spaces[agent_id] = gym.spaces.Discrete(n_actions)
+
+    def _pad_observation(self, obs: np.ndarray) -> np.ndarray:
+        """Ajusta la observación al tamaño máximo padding con ceros."""
+        if obs.shape[0] == self._max_obs_size:
+            return obs
+        padded = np.zeros((self._max_obs_size,), dtype=np.float32)
+        padded[: obs.shape[0]] = obs
+        return padded
 
     # ── Step ──────────────────────────────────────────────────────────────────
 
@@ -288,7 +301,7 @@ class MultiAgentSumoEnv:
 
         # 4. Obtener nuevas observaciones
         observations = {
-            agent_id: ts.observation
+            agent_id: self._pad_observation(ts.observation)
             for agent_id, ts in self.traffic_signals.items()
         }
 
