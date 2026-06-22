@@ -1,0 +1,18 @@
+# ── CommNet / TarMAC ─────────────────────────────────────────────────────────
+# Los agentes se pasan mensajes entre sí antes de decidir su acción
+# CommNet: media simple de mensajes | TarMAC: atención sobre mensajes (más potente)
+# ─────────────────────────────────────────────────────────────────────────────
+algorithm: "commnet"
+
+commnet:
+  lr: 0.0005
+  gamma: 0.99
+  epsilon_start: 1.0
+  epsilon_end: 0.05
+  epsilon_decay: 150_000
+  hidden_dim: 128
+  comm_dim: 32                # Dimensión del vector de mensaje entre agentes
+  comm_steps: 2               # Rondas de comunicación por paso de decisión
+  use_attention: false        # false = CommNet (media), true = TarMAC (atención)
+  # Atención TarMAC (solo si use_attention: true)
+  attention_dim: 16           # Dimensión del espacio de consulta/clave

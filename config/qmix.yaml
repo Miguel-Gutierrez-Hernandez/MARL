@@ -1,0 +1,16 @@
+# ── QMIX ─────────────────────────────────────────────────────────────────────
+# Mezcla los Q-values individuales con una red monotónica (hypernetwork)
+# Garantiza que la política centralizada sea consistente con las locales (IGM)
+# ─────────────────────────────────────────────────────────────────────────────
+algorithm: "qmix"
+
+qmix:
+  lr: 0.0005
+  gamma: 0.99
+  epsilon_start: 1.0
+  epsilon_end: 0.05
+  epsilon_decay: 150_000
+  target_update_every: 200
+  hidden_dim: 128             # Tamaño del agente RNN/MLP individual
+  mixing_embed_dim: 32        # Dimensión interna de la mixing network
+  hypernet_embed: 128         # Dimensión del hypernetwork que genera pesos

@@ -1,0 +1,16 @@
+# ── MAPPO (Multi-Agent PPO) ───────────────────────────────────────────────────
+# Cada agente tiene su actor (política local) y comparte un crítico centralizado
+# ─────────────────────────────────────────────────────────────────────────────
+algorithm: "mappo"
+
+mappo:
+  actor_lr: 0.0003
+  critic_lr: 0.001
+  gamma: 0.99
+  gae_lambda: 0.95            # Factor λ para Generalized Advantage Estimation
+  clip_eps: 0.2               # Clipping de PPO (rango [1-ε, 1+ε])
+  ppo_epochs: 5               # Actualizaciones por batch recolectado
+  value_loss_coef: 0.5        # Peso de la pérdida del crítico
+  entropy_coef: 0.05          # ↑ subido de 0.01 → mantiene exploración más tiempo
+  hidden_dim: 128
+  rollout_length: 1600        # ↑ subido de 400 → ve más consecuencias antes de actualizar
